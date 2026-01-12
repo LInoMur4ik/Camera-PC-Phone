@@ -3,30 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebRTC Streamer Pro</title>
+    <title>Streamer Ultra</title>
     <style>
-        :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #f1f5f9; }
-        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 20px; margin: 0; }
-        .container { background: var(--card); padding: 2rem; border-radius: 1rem; width: 100%; max-width: 450px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
-        video { width: 100%; border-radius: 0.75rem; background: #000; margin-top: 1rem; aspect-ratio: 16/9; object-fit: cover; }
-        .status { font-size: 0.8rem; color: #94a3b8; margin-bottom: 1rem; min-height: 1.2em; }
-        .room-box { background: rgba(56, 189, 248, 0.1); border: 1px solid var(--accent); padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; }
-        input { background: #0f172a; border: 1px solid #334155; color: white; padding: 0.75rem; border-radius: 0.5rem; width: 100%; margin: 0.5rem 0; box-sizing: border-box; font-size: 1rem; }
-        button { background: var(--accent); color: #0f172a; border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 0.5rem; transition: 0.2s; }
-        button:hover { opacity: 0.9; }
-        button.secondary { background: #334155; color: white; margin-top: 1.5rem; }
+        :root { --bg: #0a0a0c; --card: #16161a; --accent: #22c55e; --text: #f8fafc; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 15px; margin: 0; }
+        .container { background: var(--card); padding: 1.5rem; border-radius: 1.2rem; width: 100%; max-width: 400px; text-align: center; border: 1px solid #27272a; }
+        video { width: 100%; border-radius: 0.8rem; background: #000; margin-top: 1rem; aspect-ratio: 4/3; object-fit: cover; }
+        .status { font-size: 0.85rem; color: #a1a1aa; margin-bottom: 1rem; padding: 8px; border-radius: 6px; background: #27272a; }
+        .room-box { background: rgba(34, 197, 94, 0.1); border: 1px solid var(--accent); padding: 1rem; border-radius: 0.8rem; margin: 1rem 0; }
+        input { background: #0a0a0c; border: 1px solid #3f3f46; color: white; padding: 12px; border-radius: 8px; width: 100%; margin: 5px 0; box-sizing: border-box; font-size: 1rem; }
+        button { background: var(--accent); color: #052e16; border: none; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 10px; font-size: 1rem; }
+        button.secondary { background: #3f3f46; color: white; margin-top: 1.5rem; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="modeTitle" style="font-weight: bold; margin-bottom: 0.5rem;">РЕЖИМ: СЪЁМКА</div>
-    <div id="peerStatus" class="status">Инициализация...</div>
+    <div id="modeTitle" style="font-weight: bold; font-size: 1.2rem; margin-bottom: 5px;">СЪЁМКА</div>
+    <div id="peerStatus" class="status">Запуск системы...</div>
 
     <div id="broadcastSection">
         <div class="room-box">
-            ID: <b id="displayID">....</b> | PIN: <b id="displayPIN">....</b>
+            ID: <b id="displayID" style="font-size: 1.2rem;">----</b> <br>
+            PIN: <b id="displayPIN" style="font-size: 1.2rem;">----</b>
         </div>
         <video id="localVideo" autoplay playsinline muted></video>
     </div>
@@ -42,68 +42,68 @@
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-
 <script>
-    // Весь JavaScript код теперь внутри этого тега
     let isBroadcasting = true;
     let peer = null;
     let localStream = null;
+    
+    // Генерируем ID один раз при загрузке
+    const myID = Math.floor(1000 + Math.random() * 9000).toString();
+    const myPIN = Math.floor(1000 + Math.random() * 9000).toString();
 
-    const genID = () => Math.floor(1000 + Math.random() * 9000).toString();
-    const myID = genID();
-    const myPIN = genID();
-
-    function updateStatus(msg, isError = false) {
+    function log(msg, color = "#a1a1aa") {
         const el = document.getElementById('peerStatus');
         el.innerText = msg;
-        el.style.color = isError ? "#ff4444" : "#94a3b8";
+        el.style.color = color;
+        console.log(msg);
     }
 
-    function initPeer(customID) {
-        updateStatus("Подключение к сети...");
-        peer = new Peer(customID, {
-            debug: 1,
-            secure: true,
-            config: {'iceServers': [
-                { 'urls': 'stun:stun.l.google.com:19302' },
-                { 'urls': 'stun:stun1.l.google.com:19302' }
-            ]}
+    function initPeer(idToRegister) {
+        if (peer) peer.destroy();
+        
+        // Используем публичные STUN серверы Google для пробития сети
+        peer = new Peer(idToRegister, {
+            config: {
+                'iceServers': [
+                    { 'urls': 'stun:stun.l.google.com:19302' },
+                    { 'urls': 'stun:stun1.l.google.com:19302' },
+                    { 'urls': 'stun:stun2.l.google.com:19302' }
+                ]
+            }
         });
 
-        peer.on('open', id => {
-            updateStatus("Сеть готова! Можно подключаться.");
+        peer.on('open', (id) => {
+            log("Сеть: Ожидание зрителя...", "#22c55e");
             if (isBroadcasting) {
                 document.getElementById('displayID').innerText = myID;
                 document.getElementById('displayPIN').innerText = myPIN;
             }
         });
 
-        peer.on('call', call => {
-            updateStatus("Трансляция активна (подключен зритель)");
+        peer.on('call', (call) => {
+            log("Зритель подключился!", "#22c55e");
             call.answer(localStream);
         });
 
-        peer.on('error', err => {
+peer.on('error', (err) => {
+            log("Ошибка: " + err.type, "#ef4444");
             if (err.type === 'network') {
-                updateStatus("Ошибка сети. Пробую еще раз...", true);
-                setTimeout(() => initPeer(customID), 3000);
-            } else {
-                updateStatus("Ошибка: " + err.type, true);
+                setTimeout(() => initPeer(idToRegister), 5000);
             }
         });
     }
-    
+
     async function startCamera() {
-        updateStatus("Запрос камеры...");
+        log("Доступ к камере...");
         try {
             localStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment" }, 
+                video: { facingMode: "environment", width: 640 }, 
                 audio: true 
             });
             document.getElementById('localVideo').srcObject = localStream;
             initPeer('room-' + myID + '-' + myPIN);
-        } catch (err) {
-            updateStatus("Камера недоступна", true);
+        } catch (e) {
+            log("Ошибка камеры: проверьте разрешения", "#ef4444");
         }
     }
 
@@ -111,36 +111,41 @@
         const id = document.getElementById('targetId').value;
         const pin = document.getElementById('targetPin').value;
         if (!id || !pin) return alert("Введите ID и PIN");
+
+        log("Поиск трансляции...");
         
-        const targetFullID = 'room-' + id + '-' + pin;
-        updateStatus("Подключение к " + id + "...");
+        // Для просмотра создаем Peer со случайным ID
+        const viewerPeer = new Peer();
+        viewerPeer.on('open', () => {
+            const call = viewerPeer.call('room-' + id + '-' + pin, null);
+            
+            let connected = false;
+            call.on('stream', (stream) => {
+                connected = true;
+                log("Трансляция активна!", "#22c55e");
+                const v = document.getElementById('remoteVideo');
+                v.srcObject = stream;
+                v.play();
+            });
 
-        if (!peer || peer.disconnected) {
-            peer = new Peer();
-            peer.on('open', () => makeCall(targetFullID));
-        } else {
-            makeCall(targetFullID);
-        }
-    }
-
-    function makeCall(target) {
-        const call = peer.call(target, null);
-        call.on('stream', remoteStream => {
-            updateStatus("Видео получено!");
-            const v = document.getElementById('remoteVideo');
-            v.srcObject = remoteStream;
-            v.play();
+            // Проверка через 10 секунд
+            setTimeout(() => {
+                if (!connected) log("Не удалось найти камеру. Проверьте ID/PIN", "#ef4444");
+            }, 10000);
         });
+
+        viewerPeer.on('error', (err) => log("Ошибка сети: " + err.type, "#ef4444"));
     }
 
     function switchMode() {
         isBroadcasting = !isBroadcasting;
         document.getElementById('broadcastSection').classList.toggle('hidden');
         document.getElementById('watchSection').classList.toggle('hidden');
-        document.getElementById('modeTitle').innerText = isBroadcasting ? "РЕЖИМ: СЪЁМКА" : "РЕЖИМ: ПРОСМОТР";
+        document.getElementById('modeTitle').innerText = isBroadcasting ? "СЪЁМКА" : "ПРОСМОТР";
         if (isBroadcasting && !localStream) startCamera();
     }
 
+    // Старт
     startCamera();
 </script>
 </body>
