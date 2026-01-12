@@ -1,45 +1,44 @@
+LinoMur4ik, [12.01.2026 19:14]
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Streamer WebRTC</title>
+    <title>WebRTC Streamer Pro</title>
     <style>
-        :root { --bg: #121212; --card: #1e1e1e; --accent: #00ff88; --text: #e0e0e0; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-        .container { background: var(--card); padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 500px; text-align: center; }
-        video { width: 100%; border-radius: 10px; background: #000; margin-top: 15px; border: 1px solid #333; }
-        .mode-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; background: var(--accent); color: #000; font-weight: bold; margin-bottom: 15px; }
-        input { background: #333; border: 1px solid #444; color: white; padding: 12px; border-radius: 8px; width: 80%; margin: 10px 0; font-size: 16px; text-align: center; }
-        button { background: var(--accent); color: #000; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; margin: 5px; }
-        button:hover { opacity: 0.8; transform: translateY(-2px); }
-        button.secondary { background: #444; color: white; }
-        .info-panel { margin: 15px 0; padding: 10px; background: rgba(0,255,136,0.1); border-radius: 8px; border: 1px dashed var(--accent); }
+        :root { --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; --text: #f1f5f9; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 20px; margin: 0; }
+        .container { background: var(--card); padding: 2rem; border-radius: 1rem; width: 100%; max-width: 450px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); }
+        video { width: 100%; border-radius: 0.75rem; background: #000; margin-top: 1rem; aspect-ratio: 16/9; object-fit: cover; }
+        .status { font-size: 0.8rem; color: #94a3b8; margin-bottom: 1rem; }
+        .room-box { background: rgba(56, 189, 248, 0.1); border: 1px solid var(--accent); padding: 1rem; border-radius: 0.5rem; margin: 1rem 0; }
+        input { background: #0f172a; border: 1px solid #334155; color: white; padding: 0.75rem; border-radius: 0.5rem; width: 100%; margin: 0.5rem 0; box-sizing: border-box; font-size: 1rem; }
+        button { background: var(--accent); color: #0f172a; border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: bold; cursor: pointer; width: 100%; margin-top: 0.5rem; }
+        button.secondary { background: #334155; color: white; margin-top: 1.5rem; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="badge" class="mode-badge">Режим: Съёмка</div>
-    
+    <div id="modeTitle" style="font-weight: bold; margin-bottom: 0.5rem;">РЕЖИМ: СЪЁМКА</div>
+    <div id="peerStatus" class="status">Инициализация сети...</div>
+
     <div id="broadcastSection">
-        <div class="info-panel">
-            ID комнаты: <strong id="displayID">Генерация...</strong><br>
-            PIN-код: <strong id="displayPIN">...</strong>
+        <div class="room-box">
+            ID: <b id="displayID">....</b> | PIN: <b id="displayPIN">....</b>
         </div>
         <video id="localVideo" autoplay playsinline muted></video>
     </div>
 
     <div id="watchSection" class="hidden">
-        <input type="text" id="targetId" placeholder="Введите ID комнаты">
-        <input type="text" id="targetPin" placeholder="Введите PIN">
-        <button onclick="connectToStream()">Подключиться</button>
+        <input type="number" id="targetId" placeholder="Введите ID">
+        <input type="number" id="targetPin" placeholder="Введите PIN">
+        <button onclick="connectToStream()">ПОДКЛЮЧИТЬСЯ</button>
         <video id="remoteVideo" autoplay playsinline></video>
     </div>
 
-    <hr style="width:100%; border: 0; border-top: 1px solid #333; margin: 20px 0;">
-    <button class="secondary" onclick="switchMode()">Сменить режим</button>
+    <button class="secondary" onclick="switchMode()">СМЕНИТЬ РЕЖИМ</button>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
@@ -47,60 +46,97 @@
     let isBroadcasting = true;
     let peer = null;
     let localStream = null;
-    let currentPin = "";
 
-    // Функция генерации случайного ID и PIN
     const genID = () => Math.floor(1000 + Math.random() * 9000).toString();
+    const myID = genID();
+    const myPIN = genID();
 
-    function initBroadcaster() {
-        const id = genID();
-        currentPin = genID(); // PIN тоже 4 цифры для простоты
-        document.getElementById('displayID').innerText = id;
-        document.getElementById('displayPIN').innerText = currentPin;
-
-        peer = new Peer('room-' + id + '-' + currentPin);
+    function initPeer(customID) {
+        if (peer) peer.destroy();
         
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: true })
-            .then(stream => {
-                localStream = stream;
-                document.getElementById('localVideo').srcObject = stream;
-                
-                peer.on('call', call => {
-                    call.answer(localStream);
-                });
-            }).catch(err => alert("Ошибка камеры: " + err));
+        peer = new Peer(customID, {
+            debug: 2,
+            config: {'iceServers': [{ 'urls': 'stun:stun.l.google.com:19302' }]} // Добавляем Google STUN сервер
+        });
+
+        peer.on('open', id => {
+            document.getElementById('peerStatus').innerText = "Сеть готова. Ожидание подключения...";
+            if (isBroadcasting) {
+                document.getElementById('displayID').innerText = myID;
+                document.getElementById('displayPIN').innerText = myPIN;
+            }
+        });
+
+        peer.on('call', call => {
+            console.log("Входящий звонок...");
+            call.answer(localStream);
+            call.on('stream', () => console.log("Поток передан зрителю"));
+        });
+
+        peer.on('error', err => {
+            console.error(err);
+            document.getElementById('peerStatus').innerText = "Ошибка: " + err.type;
+        });
+    }
+
+    async function startCamera() {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" },
+
+LinoMur4ik, [12.01.2026 19:14]
+audio: true 
+            });
+            document.getElementById('localVideo').srcObject = localStream;
+            initPeer('room-' + myID + '-' + myPIN);
+        } catch (err) {
+            document.getElementById('peerStatus').innerText = "Нет доступа к камере!";
+        }
     }
 
     function connectToStream() {
         const id = document.getElementById('targetId').value;
         const pin = document.getElementById('targetPin').value;
-        
-        if(!peer) peer = new Peer();
+        const targetFullID = 'room-' + id + '-' + pin;
 
-const call = peer.call('room-' + id + '-' + pin, null);
+        document.getElementById('peerStatus').innerText = "Подключение к " + id + "...";
+        
+        // Для приема создаем новый Peer со случайным ID
+        if (!peer || peer.id.startsWith('room-')) {
+            peer = new Peer();
+            peer.on('open', () => makeCall(targetFullID));
+        } else {
+            makeCall(targetFullID);
+        }
+    }
+
+    function makeCall(target) {
+        const call = peer.call(target, null);
         
         call.on('stream', remoteStream => {
-            document.getElementById('remoteVideo').srcObject = remoteStream;
+            document.getElementById('peerStatus').innerText = "Трансляция активна";
+            const remoteVideo = document.getElementById('remoteVideo');
+            remoteVideo.srcObject = remoteStream;
+            // Важно для обхода блокировки автоплея:
+            remoteVideo.play().catch(e => console.log("Нажмите на видео, чтобы пошел звук/картинка"));
         });
-        
-        call.on('error', (err) => alert("Не удалось подключиться. Проверьте ID и PIN"));
     }
 
     function switchMode() {
         isBroadcasting = !isBroadcasting;
         document.getElementById('broadcastSection').classList.toggle('hidden');
         document.getElementById('watchSection').classList.toggle('hidden');
-        document.getElementById('badge').innerText = isBroadcasting ? "Режим: Съёмка" : "Режим: Просмотр";
-        document.getElementById('badge').style.background = isBroadcasting ? "#00ff88" : "#00ccff";
-
-        if (isBroadcasting && !localStream) {
-            initBroadcaster();
+        document.getElementById('modeTitle').innerText = isBroadcasting ? "РЕЖИМ: СЪЁМКА" : "РЕЖИМ: ПРОСМОТР";
+        
+        if (!isBroadcasting) {
+            document.getElementById('peerStatus').innerText = "Введите данные транслятора";
+        } else {
+            if (!localStream) startCamera();
         }
     }
 
-    // Запуск при загрузке
-    initBroadcaster();
+    // Старт
+    startCamera();
 </script>
-
 </body>
 </html>
