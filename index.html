@@ -3,44 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Транслятор (Телефон)</title>
+    <title>Streamer WebRTC</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #121212; color: white; }
-        video { width: 90%; border-radius: 10px; background: #000; margin-top: 20px; }
-        input { padding: 10px; width: 80%; margin: 10px 0; border-radius: 5px; border: none; }
+        :root { --bg: #121212; --card: #1e1e1e; --accent: #00ff88; --text: #e0e0e0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .container { background: var(--card); padding: 20px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%; max-width: 500px; text-align: center; }
+        video { width: 100%; border-radius: 10px; background: #000; margin-top: 15px; border: 1px solid #333; }
+        .mode-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; background: var(--accent); color: #000; font-weight: bold; margin-bottom: 15px; }
+        input { background: #333; border: 1px solid #444; color: white; padding: 12px; border-radius: 8px; width: 80%; margin: 10px 0; font-size: 16px; text-align: center; }
+        button { background: var(--accent); color: #000; border: none; padding: 12px 25px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; margin: 5px; }
+        button:hover { opacity: 0.8; transform: translateY(-2px); }
+        button.secondary { background: #444; color: white; }
+        .info-panel { margin: 15px 0; padding: 10px; background: rgba(0,255,136,0.1); border-radius: 8px; border: 1px dashed var(--accent); }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
-    <h1>Трансляция</h1>
-    <input type="text" id="roomId" placeholder="Введите имя комнаты (например, room123)">
-    <br>
-    <video id="localVideo" autoplay playsinline muted></video>
-    
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <script>
-        const videoElement = document.getElementById('localVideo');
-        const inputId = document.getElementById('roomId');
-        let peer = null;
 
+<div class="container">
+    <div id="badge" class="mode-badge">Режим: Съёмка</div>
+    
+    <div id="broadcastSection">
+        <div class="info-panel">
+            ID комнаты: <strong id="displayID">Генерация...</strong><br>
+            PIN-код: <strong id="displayPIN">...</strong>
+        </div>
+        <video id="localVideo" autoplay playsinline muted></video>
+    </div>
+
+    <div id="watchSection" class="hidden">
+        <input type="text" id="targetId" placeholder="Введите ID комнаты">
+        <input type="text" id="targetPin" placeholder="Введите PIN">
+        <button onclick="connectToStream()">Подключиться</button>
+        <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+
+    <hr style="width:100%; border: 0; border-top: 1px solid #333; margin: 20px 0;">
+    <button class="secondary" onclick="switchMode()">Сменить режим</button>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<script>
+    let isBroadcasting = true;
+    let peer = null;
+    let localStream = null;
+    let currentPin = "";
+
+    // Функция генерации случайного ID и PIN
+    const genID = () => Math.floor(1000 + Math.random() * 9000).toString();
+
+    function initBroadcaster() {
+        const id = genID();
+        currentPin = genID(); // PIN тоже 4 цифры для простоты
+        document.getElementById('displayID').innerText = id;
+        document.getElementById('displayPIN').innerText = currentPin;
+
+        peer = new Peer('room-' + id + '-' + currentPin);
+        
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: true })
             .then(stream => {
-                videoElement.srcObject = stream;
-
-                // Как только ввели ID, инициализируем Peer
-                inputId.addEventListener('change', () => {
-                    if (peer) peer.destroy();
-                    
-                    peer = new Peer(inputId.value);
-                    
-                    peer.on('open', (id) => {
-                        alert('Комната создана: ' + id + '. Теперь введи это имя на компьютере.');
-                    });
-
-                    peer.on('call', call => {
-                        call.answer(stream);
-                    });
+                localStream = stream;
+                document.getElementById('localVideo').srcObject = stream;
+                
+                peer.on('call', call => {
+                    call.answer(localStream);
                 });
-            });
-    </script>
+            }).catch(err => alert("Ошибка камеры: " + err));
+    }
+
+    function connectToStream() {
+        const id = document.getElementById('targetId').value;
+        const pin = document.getElementById('targetPin').value;
+        
+        if(!peer) peer = new Peer();
+
+const call = peer.call('room-' + id + '-' + pin, null);
+        
+        call.on('stream', remoteStream => {
+            document.getElementById('remoteVideo').srcObject = remoteStream;
+        });
+        
+        call.on('error', (err) => alert("Не удалось подключиться. Проверьте ID и PIN"));
+    }
+
+    function switchMode() {
+        isBroadcasting = !isBroadcasting;
+        document.getElementById('broadcastSection').classList.toggle('hidden');
+        document.getElementById('watchSection').classList.toggle('hidden');
+        document.getElementById('badge').innerText = isBroadcasting ? "Режим: Съёмка" : "Режим: Просмотр";
+        document.getElementById('badge').style.background = isBroadcasting ? "#00ff88" : "#00ccff";
+
+        if (isBroadcasting && !localStream) {
+            initBroadcaster();
+        }
+    }
+
+    // Запуск при загрузке
+    initBroadcaster();
+</script>
+
 </body>
 </html>
